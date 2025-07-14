@@ -1,9 +1,11 @@
-## Interface: 110100
+## Interface: 110200
 ## Title: RaidTools
 ## Notes: An addon for raid leaders.
 ## Author: SinfulFish
-## Version: 11.1.0Rv12
-## SavedVariables: BList
-Raidtools.lua
-RaidToolsOptions.lua
-PlayerModule.lua
+## Version: 11.1.0Rv13
+## SavedVariables: BList, RaidToolsDB 
+
+RaidTools.lua
+RaidToolsUtils.lua
+FlyoutMenu.lua
+ModeSelector.lua
