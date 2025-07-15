@@ -1,7 +1,6 @@
 -- ModeSelector.lua
 
 print(">> RaidTools: ModeSelector loaded")
-
 local ModeSelector = {}
 
 local modePopup = CreateFrame("Frame", "RaidToolsModePopup", UIParent, "BackdropTemplate")
@@ -47,15 +46,11 @@ CreateModeButton("My Group", -85)
 --------------------------------------------------
 
 function ModeSelector:SetMode(mode)
-
-    if UIDropDownMenu_SetText then
-        UIDropDownMenu_SetText(RaidToolsModeDropdown, mode)
-    end
-
     modePopup:Hide()
-    db.currentMode = mode
-    db._modeConfirmed = true
+    _G.RaidToolsDB.currentMode = mode
+    _G.RaidToolsDB._modeConfirmed = true
     print(">> RaidTools mode set to:", mode)
+    RefreshRTSystem()
 end
 
 function ModeSelector:Show()
@@ -63,7 +58,7 @@ function ModeSelector:Show()
 end
 
 function ModeSelector:PromptIfNeeded()
-    if IsInGroup() and not (db and db._modeConfirmed) then
+    if (IsInGroup() == true or IsInRaid() == true) and _G.RaidToolsDB._modeConfirmed == false then
         ModeSelector:Show()
     end
 end

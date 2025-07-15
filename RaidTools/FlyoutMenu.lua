@@ -1,7 +1,6 @@
 -- FlyoutMenu.lua
 
 print(">> RaidTools: FlyoutMenu loaded")
-
 local FlyoutMenu = CreateFrame("Frame", "RaidToolsFlyout", UIParent, "BackdropTemplate")
 FlyoutMenu:SetSize(180, 280)
 FlyoutMenu:SetPoint("CENTER")
@@ -31,7 +30,7 @@ local modes = { "None", "Silent", "My Group" }
 
 -- Sync dropdown with current SavedVariables on load
 local function SyncDropdownWithDB()
-    local mode = db.currentMode or "None"
+    local mode = _G.RaidToolsDB.currentMode or "None"
     UIDropDownMenu_SetText(modeDropdown, mode)
 end
 
@@ -40,8 +39,8 @@ UIDropDownMenu_Initialize(modeDropdown, function(self, level)
         local info = UIDropDownMenu_CreateInfo()
         info.text = mode
         info.func = function()
-            db.currentMode = mode
-            db._modeConfirmed = true
+            _G.RaidToolsDB.currentMode = mode
+            _G.RaidToolsDB._modeConfirmed = true
             UIDropDownMenu_SetText(modeDropdown, mode)
             print(">> RaidTools mode changed to:", mode)
         end
@@ -86,26 +85,29 @@ local blacklistContent = CreateScrollList(FlyoutMenu, "Blacklist", -115)
 
 function FlyoutMenu:UpdateLists(groupMembers, db)
     local blackListIndex, strikeIndex = 1, 1
+    -- Clear old entries
     for i = 1, 10 do
-        if strikeContent.lines[i] then
-            strikeContent.lines[i]:SetText("")
-            strikeContent.lines[i]:Hide()
-        end
-        if blacklistContent.lines[i] then
-            blacklistContent.lines[i]:SetText("")
-            blacklistContent.lines[i]:Hide()
-        end
+        strikeContent.lines[i]:SetText("")
+        strikeContent.lines[i]:Hide()
+        blacklistContent.lines[i]:SetText("")
+        blacklistContent.lines[i]:Hide()
     end
+
+    -- Show group members with strikes
     for _, name in ipairs(groupMembers) do
-        if db.strikes[name] and strikeContent.lines[strikeIndex] then
-            strikeContent.lines[strikeIndex]:SetText("• " .. name .. " (" .. db.strikes[name] .. ")")
-            strikeContent.lines[strikeIndex]:Show()
-            strikeIndex = strikeIndex + 1
+        if _G.RaidToolsDB.strikes and _G.RaidToolsDB.strikes[name] then
+            if strikeContent.lines[strikeIndex] then
+                strikeContent.lines[strikeIndex]:SetText("• " .. name .. " (" .. _G.RaidToolsDB.strikes[name] .. ")")
+                strikeContent.lines[strikeIndex]:Show()
+                strikeIndex = strikeIndex + 1
+            end
         end
-        if db.blacklist[name] and blacklistContent.lines[blackListIndex] then
-            blacklistContent.lines[blackListIndex]:SetText("• " .. name)
-            blacklistContent.lines[blackListIndex]:Show()
-            blackListIndex = blackListIndex + 1
+        if _G.RaidToolsDB.blacklist and _G.RaidToolsDB.blacklist[name] then
+            if blacklistContent.lines[blackListIndex] then
+                blacklistContent.lines[blackListIndex]:SetText("• " .. name)
+                blacklistContent.lines[blackListIndex]:Show()
+                blackListIndex = blackListIndex + 1
+            end
         end
     end
 end
@@ -132,7 +134,7 @@ warnButton:SetPoint("TOPLEFT", nameBox, "BOTTOMLEFT", 0, -5)
 warnButton:SetScript("OnClick", function()
     local targetName = nameBox:GetText()
     if targetName and targetName ~= "" then
-        RaidToolsUtils.StrikeWarn(targetName, true)
+        RaidToolsUtils.AddStrike(targetName, true)
     end
 end)
 
@@ -143,7 +145,7 @@ kickButton:SetPoint("TOPLEFT", warnButton, "BOTTOMLEFT", 0, -5)
 kickButton:SetScript("OnClick", function()
     local targetName = nameBox:GetText()
     if targetName and targetName ~= "" then
-        RaidToolsUtils.StrikeKick(targetName, true)
+        RaidToolsUtils.AddToBlacklist(targetName, true, true)
     end
 end)
 
@@ -167,7 +169,7 @@ end
 
 function FlyoutMenu:Refresh(groupMembers, db, targetName, isTargetedPlayer)
     self:UpdateLists(groupMembers, db)
-
+    SyncDropdownWithDB()
     if isTargetedPlayer then
         local inGroup = tContains(groupMembers, targetName)
         self:ShowPlayerBlock(targetName, inGroup)

@@ -1,24 +1,27 @@
 -- RaidTools.lua
 
-db = _G.RaidToolsDB or {}
+_G.RaidToolsDB = _G.RaidToolsDB or {}
+if not _G.RaidToolsDB.blacklist then _G.RaidToolsDB.blacklist = {} end
+if not _G.RaidToolsDB.strikes then _G.RaidToolsDB.strikes = {} end
+if _G.RaidToolsDB._BListMigrated == nil then _G.RaidToolsDB._BListMigrated = false end
+if not _G.RaidToolsDB.currentMode then _G.RaidToolsDB.currentMode = "None" end
+if not _G.RaidToolsDB.rollMode then _G.RaidToolsDB.rollMode = "Track" end
+_G.RaidToolsDB._modeConfirmed = false
 
-function SaveRaidToolsData()
-    _G.RaidToolsDB = db
-end
-
-local function RefreshRTSystem()
+function RefreshRTSystem()
     local group = RaidToolsUtils:GetCurrentGroupMembers()
     local name, realm = UnitName("target")
     local fullName = ""
-    local hasTarget = name ~= nil and name ~= ""
-
+    local hasTarget = name ~= nil and name ~= "" and UnitIsPlayer("target")
+    
     if realm == nil then
         realm = GetRealmName()
     end
-    if hasTarget and name then
+    
+    if hasTarget and name and realm then
         fullName = name .. "-" .. realm
     end
-    
+
     FlyoutMenu:Refresh(group, RaidToolsDB, fullName, hasTarget)
 
     ModeSelector:PromptIfNeeded()
@@ -28,20 +31,13 @@ local function OnPlayerLogin()
     print(">>RaidTools: Loaded Version " .. (C_AddOns.GetAddOnMetadata("RaidTools", "Version") or "unknown"))
 
     local hasLegacyBList = type(_G.BList) == "table" and next(_G.BList) ~= nil
-    if not db.blacklist then db.blacklist = {} end
-    if not db.strikes then db.strikes = {} end
-    if db._BListMigrated == nil then db._BListMigrated = false end
-    if not db.currentMode then db.currentMode = "None" end
-    db._modeConfirmed = false
-    SaveRaidToolsData()
-    RefreshRTSystem()
 
-    if not db._BListMigrated then
+    if _G.RaidToolsDB._BListMigrated == false then
         if hasLegacyBList then
             print(">>RaidTools: Migrating legacy BList...")
 
             for name in pairs(_G.BList) do
-                db.blacklist[name] = true
+                _G.RaidToolsDB.blacklist[name] = true
             end
 
             print(">>RaidTools: Migration complete.")
@@ -49,14 +45,16 @@ local function OnPlayerLogin()
             print(">>RaidTools: Migration already done.")
         end
 
-        db._BListMigrated = true
-        SaveRaidToolsData()
+        _G.RaidToolsDB._BListMigrated = true
+        _G.RaidToolsDB._modeConfirmed = false
+        C_Timer.After(2, function ()
+            RefreshRTSystem()
+        end)
     end
 end
 
 local function OnPlayerLogout()
-    db._modeConfirmed = false
-    SaveRaidToolsData()
+    _G.RaidToolsDB._modeConfirmed = false
 end
 
 local function OnPlayerTargetChanged()

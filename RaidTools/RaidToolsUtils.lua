@@ -1,98 +1,84 @@
 local RaidToolsUtils = {}
-
 -- List Functions
-function RaidToolsUtils.AddToBlacklist(playerName)
-    db.blacklist = db.blacklist or {}
-    db.blacklist[playerName] = true
-    SaveRaidToolsData()
-    print(playerName .. " has been added to the blacklist.")
+function RaidToolsUtils.IsBlacklisted(playerName)
+    return _G.RaidToolsDB.blacklist and _G.RaidToolsDB.blacklist[playerName] == true
+end
+
+function RaidToolsUtils.GetStrikeCount(playerName)
+    return _G.RaidToolsDB.strikes and _G.RaidToolsDB.strikes[playerName] or 0
+end
+
+function RaidToolsUtils.AddToBlacklist(playerName, shouldRaidWarn, shouldKick)
+    if RaidToolsUtils.IsBlacklisted(playerName) == false then
+        RaidToolsUtils.ClearStrikes(playerName)
+        _G.RaidToolsDB.blacklist[playerName] = true
+        print("Added " .. playerName .. " to the blacklist.")
+    end
+    if _G.RaidToolsDB._modeConfirmed == true and _G.RaidToolsDB.currentMode == "My Group" then
+        shouldRaidWarn = shouldRaidWarn or false
+        shouldKick = shouldKick or false
+        local chatType = "SAY" -- Default fallback
+        if IsInRaid() then
+            if shouldRaidWarn then
+                chatType = "RAID_WARNING"
+            else
+                chatType = "RAID"
+            end
+        elseif IsInGroup() then
+            chatType = "PARTY"
+        end
+        if shouldKick then
+            SendChatMessage(">>RaidTools: " .. playerName .. " has been kicked for repeated offenses. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
+            SendChatMessage("Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
+            UninviteUnit(playerName)
+        else
+            SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
+            SendChatMessage("Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
+        end
+    end
 end
 
 function RaidToolsUtils.RemoveFromBlacklist(playerName)
-    if db.blacklist and db.blacklist[playerName] then
-        db.blacklist[playerName] = nil
-        SaveRaidToolsData()
+    if RaidToolsUtils.IsBlacklisted(playerName) == true then
+        _G.RaidToolsDB.blacklist[playerName] = nil
         print("Removed " .. playerName .. " from blacklist.")
     end
 end
 
-function RaidToolsUtils.AddStrike(playerName)
-    if RaidToolsUtils.IsBlacklisted(playerName) then
-        print(playerName .. " is already blacklisted. Cannot add strike.")
-    else
-        db.strikes = db.strikes or {}
-        db.strikes[playerName] = (db.strikes[playerName] or 0) + 1
-        SaveRaidToolsData()
-        print(playerName .. " has " .. db.strikes[playerName] .. " strike(s).")
+function RaidToolsUtils.AddStrike(playerName, shouldRaidWarn)
+    _G.RaidToolsDB.strikes = _G.RaidToolsDB.strikes or {}
+    _G.RaidToolsDB.strikes[playerName] = (_G.RaidToolsDB.strikes[playerName] or 0) + 1
+    print("Added strike for " .. playerName .. ". Total strikes: " .. _G.RaidToolsDB.strikes[playerName])
 
-        if db.strikes[playerName] >= 2 then
-            RaidToolsUtils.AddToBlacklist(playerName)
-            RaidToolsUtils.ClearStrikes(playerName)
-            SaveRaidToolsData()
-            print("Auto-blacklisted after 2 strikes.")
+    if _G.RaidToolsDB._modeConfirmed == true and _G.RaidToolsDB.currentMode == "My Group" then
+        shouldRaidWarn = shouldRaidWarn or false
+        local chatType = "SAY" -- Default fallback
+        if IsInRaid() then
+            if shouldRaidWarn then
+                chatType = "RAID_WARNING"
+            else
+                chatType = "RAID"
+            end
+        elseif IsInGroup() then
+            chatType = "PARTY"
         end
+        if _G.RaidToolsDB.strikes[playerName] == 1 then
+            SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
+            SendChatMessage("Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
+        end
+    end
+
+    if _G.RaidToolsDB.strikes[playerName] >= 2 then
+        RaidToolsUtils.AddToBlacklist(playerName, true, true)
+        print("Auto-blacklisted after 2 strikes.")
     end
 end
 
 function RaidToolsUtils.ClearStrikes(playerName)
-    if db.strikes[playerName] then
-        db.strikes[playerName] = nil
-        SaveRaidToolsData()
+    if _G.RaidToolsDB.strikes[playerName] then
+        _G.RaidToolsDB.strikes[playerName] = nil
         print("Cleared strikes for " .. playerName)
     end
-end
-
-function RaidToolsUtils.IsBlacklisted(playerName)
-    return db.blacklist and db.blacklist[playerName] == true
-end
-
-function RaidToolsUtils.GetStrikeCount(playerName)
-    return db.strikes and db.strikes[playerName] or 0
-end
-
--- Disciplinary Functions
-function RaidToolsUtils.StrikeWarn(playerName, RaidWarning)
-    RaidWarning = RaidWarning or false
-    local chatType = "SAY" -- Default fallback
-    if IsInRaid() then
-        if RaidWarning then
-            chatType = "RAID_WARNING"
-        else
-            chatType = "RAID"
-        end
-    elseif IsInGroup() then
-        chatType = "PARTY"
-    end
-    
-    if db._modeConfirmed and db.currentMode == "My Group" then
-        SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
-        SendChatMessage("Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
-    end
-
-    RaidToolsUtils.AddStrike(playerName)
-end
-
-function RaidToolsUtils.StrikeKick(playerName, RaidWarning)
-    RaidWarning = RaidWarning or false
-    local chatType = "SAY" -- Default fallback
-    if IsInRaid() then
-        if RaidWarning then
-            chatType = "RAID_WARNING"
-        else
-            chatType = "RAID"
-        end
-    elseif IsInGroup() then
-        chatType = "PARTY"
-    end
-
-    if db._modeConfirmed and db.currentMode == "My Group" then
-        SendChatMessage(">>RaidTools: " .. playerName .. " has been kicked for repeated offenses. We don't accept the following; Ninja looting, Abusing (Swearing at others", chatType)
-        SendChatMessage("and/or Trolling) Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
-    end
-
-    RaidToolsUtils.AddStrike(playerName)
-    -- May not work
-    UninviteUnit(playerName)
 end
 
 -- Utility Functions
@@ -101,14 +87,13 @@ function RaidToolsUtils.GetCurrentGroupMembers()
     local groupMembers = {}
     if IsInRaid() then
         for i = 1, GetNumGroupMembers() do
-            local name, realm = GetRaidRosterInfo(i)
+            local name, realm = UnitName("raid" .. i)
             if realm == nil then
                 realm = GetRealmName()
             end
             if name then
                 local fullName = name .. "-" .. realm
                 table.insert(groupMembers, fullName)
-                print (">> RaidTools: Found group member:", fullName)
             end
         end
     elseif IsInGroup() then
@@ -136,6 +121,5 @@ function RaidToolsUtils.GetCurrentGroupMembers()
     end
     return groupMembers
 end
-
 
 _G.RaidToolsUtils = RaidToolsUtils
