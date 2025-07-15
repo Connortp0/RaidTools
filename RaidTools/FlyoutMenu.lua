@@ -1,5 +1,5 @@
 -- FlyoutMenu.lua
-local targetName = nil
+SavedTargetName = ""
 print(">> RaidTools: FlyoutMenu loaded")
 local FlyoutMenu = CreateFrame("Frame", "RaidToolsFlyout", UIParent, "BackdropTemplate")
 FlyoutMenu:SetSize(180, 280)
@@ -131,8 +131,8 @@ warnButton:SetSize(150, 20)
 warnButton:SetText("Warn")
 warnButton:SetPoint("TOPLEFT", nameBox, "BOTTOMLEFT", 0, -5)
 warnButton:SetScript("OnClick", function()
-    if targetName and targetName ~= "" then
-        RaidToolsUtils.AddStrike(targetName, true)
+    if SavedTargetName and SavedTargetName ~= "" then
+        RaidToolsUtils.AddStrike(SavedTargetName, true)
     end
 end)
 
@@ -141,8 +141,8 @@ kickButton:SetSize(150, 20)
 kickButton:SetText("Kick")
 kickButton:SetPoint("TOPLEFT", warnButton, "BOTTOMLEFT", 0, -5)
 kickButton:SetScript("OnClick", function()
-    if targetName and targetName ~= "" then
-        RaidToolsUtils.AddToBlacklist(targetName, true, true)
+    if SavedTargetName and SavedTargetName ~= "" then
+        RaidToolsUtils.AddToBlacklist(SavedTargetName, true, true)
     end
 end)
 
@@ -167,6 +167,7 @@ end
 function FlyoutMenu:Refresh(groupMembers, db, targetName, isTargetedPlayer)
     self:UpdateLists(groupMembers, db)
     SyncDropdownWithDB()
+    SavedTargetName = targetName or ""
     if isTargetedPlayer then
         local inGroup = tContains(groupMembers, targetName)
         self:ShowPlayerBlock(targetName, inGroup)
