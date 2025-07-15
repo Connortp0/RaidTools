@@ -1,5 +1,5 @@
 -- FlyoutMenu.lua
-
+local targetName = nil
 print(">> RaidTools: FlyoutMenu loaded")
 local FlyoutMenu = CreateFrame("Frame", "RaidToolsFlyout", UIParent, "BackdropTemplate")
 FlyoutMenu:SetSize(180, 280)
@@ -123,7 +123,6 @@ playerBlock:Hide()
 
 local nameBox = CreateFrame("EditBox", nil, playerBlock, "InputBoxTemplate")
 nameBox:SetAutoFocus(false)
-nameBox:SetEnabled(false)
 nameBox:SetSize(150, 20)
 nameBox:SetPoint("TOP", 0, -5)
 
@@ -132,7 +131,6 @@ warnButton:SetSize(150, 20)
 warnButton:SetText("Warn")
 warnButton:SetPoint("TOPLEFT", nameBox, "BOTTOMLEFT", 0, -5)
 warnButton:SetScript("OnClick", function()
-    local targetName = nameBox:GetText()
     if targetName and targetName ~= "" then
         RaidToolsUtils.AddStrike(targetName, true)
     end
@@ -143,7 +141,6 @@ kickButton:SetSize(150, 20)
 kickButton:SetText("Kick")
 kickButton:SetPoint("TOPLEFT", warnButton, "BOTTOMLEFT", 0, -5)
 kickButton:SetScript("OnClick", function()
-    local targetName = nameBox:GetText()
     if targetName and targetName ~= "" then
         RaidToolsUtils.AddToBlacklist(targetName, true, true)
     end
