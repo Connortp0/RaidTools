@@ -47,9 +47,12 @@ local function OnPlayerLogin()
 
         _G.RaidToolsDB._BListMigrated = true
         _G.RaidToolsDB._modeConfirmed = false
-        C_Timer.After(2, function ()
-            RefreshRTSystem()
-        end)
+    end
+end
+
+local function OnAddonLoaded(addonName)
+    if addonName == "RaidTools" then
+        RefreshRTSystem()
     end
 end
 
@@ -67,12 +70,15 @@ end
 
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 frame:RegisterEvent("PLAYER_LOGOUT")
-frame:SetScript("OnEvent", function(self, event, ...)
+frame:SetScript("OnEvent", function(self, event, addonName)
     if event == "PLAYER_LOGIN" then
         OnPlayerLogin()
+    elseif event == "ADDON_LOADED" then
+        OnAddonLoaded(addonName)
     elseif event == "PLAYER_LOGOUT" then
         OnPlayerLogout()
     elseif event == "PLAYER_TARGET_CHANGED" then
@@ -81,3 +87,71 @@ frame:SetScript("OnEvent", function(self, event, ...)
         OnGroupRosterUpdate()
     end
 end)
+
+SLASH_RAIDTOOLS1 = "/rt"
+SLASH_RAIDTOOLS2 = "/raidtools"
+
+function SlashCmdList.RAIDTOOLS(msg, editBox)
+    local cmd, subcmd, arg = msg:match("^(%S*)%s*(%S*)%s*(.-)$")
+    if cmd == "" then
+        print(">>RaidTools Commands:")
+        print("You can use /rt or /raidtools followed by a command.")
+        print("/rt - Show this help message")
+        print("/rt refresh - Refresh group and target info")
+        print("/rt strike - List all strike entries")
+        print("/rt strike add <Name-Realm> - Add a strike")
+        print("/rt strike remove <Name-Realm> - Remove strikes")
+        print("/rt blacklist - List blacklist entries")
+        print("/rt blacklist add <Name-Realm> - Add to blacklist")
+        print("/rt blacklist remove <Name-Realm> - Remove from blacklist")
+    elseif cmd == "refresh" then
+        RefreshRTSystem()
+    elseif cmd == "strike" then
+        if subcmd == "" then
+            for playerName, strikes in pairs(_G.RaidToolsDB.strikes) do
+                print(playerName .. " has " .. strikes .. " strike(s).")
+            end
+        elseif subcmd == "add" then
+            if arg and arg:match("^[^%-]+%-.+$") then
+                local fullName = arg
+                RaidToolsUtils.AddStrike(fullName, false, true)
+            else
+                print("Usage: /rt strike add <Name-Realm>")
+            end
+        elseif subcmd == "remove" then
+            if arg and arg:match("^[^%-]+%-.+$") then
+                local fullName = arg
+                RaidToolsUtils.ClearStrikes(fullName)
+            else
+                print("Usage: /rt strike remove <Name-Realm>")
+            end
+        else
+            print("Unknown subcommand for /rt strike. Use 'add' or 'remove' or '' to list striked players.")
+        end
+    elseif cmd == "blacklist" then
+        if subcmd == "" then
+            for playerName in pairs(_G.RaidToolsDB.blacklist) do
+                print(playerName .. " is blacklisted.")
+            end
+        elseif subcmd == "add" then
+            if arg and arg:match("^[^%-]+%-.+$") then
+                local fullName = arg
+                RaidToolsUtils.AddToBlacklist(fullName, false, false, true)
+            else
+                print("Usage: /rt blacklist add <Name-Realm>")
+            end
+        elseif subcmd == "remove" then
+            if arg and arg:match("^[^%-]+%-.+$") then
+                local fullName = arg
+                RaidToolsUtils.RemoveFromBlacklist(fullName)
+            else
+                print("Usage: /rt blacklist remove <Name-Realm>")
+            end
+        else
+            print("Unknown subcommand for /rt blacklist. Use 'add' or 'remove' or '' to list blacklisted players.")
+        end
+    else
+        print("Unknown command: " .. cmd)
+        print("Use /rt for a list of commands.")
+    end
+end
