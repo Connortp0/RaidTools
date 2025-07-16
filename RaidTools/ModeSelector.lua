@@ -4,15 +4,15 @@ print(">> RaidTools: ModeSelector loaded")
 local ModeSelector = {}
 
 local modePopup = CreateFrame("Frame", "RaidToolsModePopup", UIParent, "BackdropTemplate")
-modePopup:SetSize(260, 140)
+modePopup:SetSize(220, 120)
 modePopup:SetPoint("CENTER")
 modePopup:SetBackdrop({
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+    bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
+    edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
     edgeSize = 16,
     insets = { left = 4, right = 4, top = 4, bottom = 4 }
 })
-modePopup:SetBackdropColor(0, 0, 0, 0.85)
+modePopup:SetBackdropColor(0, 0, 0, 0.8)
 modePopup:Hide()
 
 --------------------------------------------------
@@ -32,14 +32,21 @@ local function CreateModeButton(label, offsetY)
     button:SetSize(180, 24)
     button:SetText(label)
     button:SetPoint("TOP", modeText, "BOTTOM", 0, offsetY)
+    button:SetNormalFontObject("GameFontHighlight")
+    button:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Change the addon mode", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    button:SetScript("OnLeave", GameTooltip_Hide)
     button:SetScript("OnClick", function()
         ModeSelector:SetMode(label)
     end)
 end
 
-CreateModeButton("None", -25)
-CreateModeButton("Silent", -55)
-CreateModeButton("My Group", -85)
+CreateModeButton("None", -5)
+CreateModeButton("Silent", -35)
+CreateModeButton("My Group", -65)
 
 --------------------------------------------------
 -- ⚙️ Mode Logic
