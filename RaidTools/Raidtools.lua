@@ -5,7 +5,7 @@ if not _G.RaidToolsDB.blacklist then _G.RaidToolsDB.blacklist = {} end
 if not _G.RaidToolsDB.strikes then _G.RaidToolsDB.strikes = {} end
 if _G.RaidToolsDB._BListMigrated == nil then _G.RaidToolsDB._BListMigrated = false end
 if not _G.RaidToolsDB.currentMode then _G.RaidToolsDB.currentMode = "None" end
-if not _G.RaidToolsDB.rollMode then _G.RaidToolsDB.rollMode = "Track" end
+if not _G.RaidToolsDB.rollMode then _G.RaidToolsDB.rollMode = "track" end
 _G.RaidToolsDB._modeConfirmed = false
 
 function RefreshRTSystem()

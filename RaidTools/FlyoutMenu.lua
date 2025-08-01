@@ -85,16 +85,6 @@ local function CreateScrollList(parent, title, anchorY)
     content:SetSize(150, 90)
     scrollFrame:SetScrollChild(content)
 
-    local borderFrame = CreateFrame("Frame", nil, scrollFrame, "BackdropTemplate")
-    borderFrame:SetAllPoints(scrollFrame)
-    borderFrame:SetBackdrop({
-        bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
-        edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
-        edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    borderFrame:SetBackdropColor(0, 0, 0, 0.6)
-
     content.lines = {}
 
     for i = 1, 10 do
@@ -138,6 +128,10 @@ function FlyoutMenu:UpdateLists(groupMembers, db)
                 blacklistContent.lines[blackListIndex]:SetTextColor(unpack(color))
                 blacklistContent.lines[blackListIndex]:Show()
                 blackListIndex = blackListIndex + 1
+                local playerBListWarn = ">>RaidTools: " .. name .. " is on your Raid Tools BList."
+                print(playerBListWarn)
+                RaidNotice_AddMessage(RaidWarningFrame, playerBListWarn, { r = 1.0, g = 0.0, b = 0.0 }) -- red text, no sound
+
             end
         end
     end

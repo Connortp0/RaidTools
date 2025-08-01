@@ -1,3 +1,4 @@
+-- RaidToolsUtils.lua
 local RaidToolsUtils = {}
 -- List Functions
 function RaidToolsUtils.IsBlacklisted(playerName)
@@ -75,7 +76,8 @@ function RaidToolsUtils.AddStrike(playerName, shouldRaidWarn, cmd)
             end
         end
         if _G.RaidToolsDB.strikes[playerName] >= 2 then
-            RaidToolsUtils.AddToBlacklist(playerName, true, true)
+            RaidToolsUtils.AddToBlacklist(playerName, true, true, false)
+            UninviteUnit(playerName)
             print("Auto-blacklisted after 2 strikes.")
         end
     else
