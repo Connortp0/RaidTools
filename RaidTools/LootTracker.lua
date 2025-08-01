@@ -1,8 +1,6 @@
 print(">> RaidTools: LootTracker loaded")
 local LootTracker = {}
 
-local CURRENT_SEASON = 2 -- Or use timestamp markers
-
 -- 📊 Track Rankings and Max Item Levels
 local TRACK_ORDER = {
     ["Explorer"] = 1, ["Adventurer"] = 2,
@@ -12,318 +10,234 @@ local TRACK_ORDER = {
 
 local TRACK_MAX_ILVL = {
     ["Explorer"] = 619, ["Adventurer"] = 632,
-    ["Veteran"] = 662, ["Champion"] = 658,
+    ["Veteran"] = 645, ["Champion"] = 658,
     ["Hero"] = 671, ["Myth"] = 684
 }
 
--- 🔍 Tooltip Parsers
-local function GetUpgradeTrack(itemLink)
+local SLOT_NAME_MAPPING = {
+    ["Head"] = { "HEADSLOT" },
+    ["Neck"] = { "NECKSLOT" },
+    ["Shoulder"] = { "SHOULDERSLOT" },
+    ["Shirt"] = { "SHIRTSLOT" },
+    ["Chest"] = { "CHESTSLOT" },
+    ["Waist"] = { "WAISTSLOT" },
+    ["Legs"] = { "LEGSSLOT" },
+    ["Feet"] = { "FEETSLOT" },
+    ["Wrist"] = { "WRISTSLOT" },
+    ["Hands"] = { "HANDSSLOT" },
+    ["Back"] = { "BACKSLOT" },
+    ["Finger"] = { "FINGER0SLOT", "FINGER1SLOT" },
+    ["Trinket"] = { "TRINKET0SLOT", "TRINKET1SLOT" },
+    ["One-%Hand"] = { "MAINHANDSLOT" },
+    ["Two-%Hand"] = { "MAINHANDSLOT" },
+    ["Held In Off%-Hand"] = { "SECONDARYHANDSLOT" },
+    ["Ranged"] = { "RANGEDSLOT" },
+    ["Tabard"] = { "TABARDSLOT" }
+}
+
+local function GetInventorySlotsFromParsed(parsedSlotName)
+    local tokens = SLOT_NAME_MAPPING[parsedSlotName]
+    if not tokens then
+        RaidToolsUtils.PrintDebug("No mapping for parsed slot name: " .. tostring(parsedSlotName))
+        return {}
+    end
+
+    local slotIds = {}
+    for _, token in ipairs(tokens) do
+        local slotId = GetInventorySlotInfo(token)
+        if slotId then
+            table.insert(slotIds, slotId)
+        end
+    end
+    return slotIds
+end
+
+-- New System
+local function ParseTooltipLines(tooltip)
+    local parsed = {
+        itemLevel = nil,
+        upgradeTrack = nil,
+        slot = nil,
+        isCrafted = false,
+        isLegacySeasonGear = false
+    }
+
+    local slotMatchers = {
+        "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands",
+        "Waist", "Legs", "Feet", "Finger", "Trinket",
+        "One-%Hand", "Two-%Hand", "Held In Off%-Hand"
+    }
+
+    for i = i, tooltip:NumLines() do
+        local line = _G["LootTrackerTooltipTextLeft" .. i]:GetText()
+        if line then
+            -- Item Level
+            local ilvl = line:match("Item Level (%d+)")
+            if ilvl then parsed.itemLevel = tonumber(ilvl) end
+
+            -- Upgrade Track
+            local track = line:match("Upgrade Level: (%a+) (%d+)/%d+")
+            if track then parsed.upgradeTrack = track end
+
+            -- Slot
+            for _, matcher in ipairs(slotMatchers) do
+                if line:find(matcher) then
+                    parsed.slot = matcher:gsub("%%%-", "-")
+                    break
+                end
+            end
+
+            -- Crafted Check
+            if line:lower():find("crafted") then parsed.isCrafted = true end
+
+            -- Season Check
+            if line:lower():find("season") then parsed.isLegacySeasonGear = true end
+        end
+    end
+
+    return parsed
+end
+
+function ScanTooltip(tooltip, itemLink)
+    local parsed = ParseTooltipLines(tooltip)
+    parsed.itemLink = itemLink
+    return parsed
+end
+
+function ScanItem(itemLink)
     local tooltip = CreateFrame("GameTooltip", "LootTrackerTooltip", nil, "GameTooltipTemplate")
     tooltip:SetOwner(UIParent, "ANCHOR_NONE")
     tooltip:SetHyperlink(itemLink)
 
-    print(">> DEBUG: Scanning upgrade track for item = " .. tostring(itemLink))
+    return ScanTooltip(tooltip, itemLink)
+end
 
-    for i = 1, tooltip:NumLines() do
-        local line = _G["LootTrackerTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-        if text then
-            print(">> DEBUG: Tooltip line " .. i .. ": " .. text)
-            for track in pairs(TRACK_ORDER) do
-                if text:find(track) then
-                    print(">> DEBUG: Found upgrade track = " .. track)
-                    return track
+-- Compares loot against a list of equipped itemLinks
+local function IsLootBetterThanEquipped(parsedLoot, equippedLinks)
+    local mode = _G.RaidToolsDB and _G.RaidToolsDB.rollMode or "track"
+
+    for _, eqLink in ipairs(equippedLinks) do
+        local eq = ScanItem(eqLink)
+
+        if eq.itemLevel then
+            if mode == "ilvl" then
+                if parsedLoot.itemLevel > eq.itemLevel then return true end
+            else
+                if parsedLoot.isCrafted then
+                    local maxTrackIlvl = TRACK_MAX_ILVL[parsedLoot.upgradeTrack]
+                    if maxTrackIlvl then
+                        if eq.itemLevel >= maxTrackIlvl then
+                            return false
+                        elseif parsedLoot.itemLevel > eq.itemLevel then
+                            return true
+                        end
+                    end
+                else
+                    if eq.isLegacySeasonGear and not parsedLoot.isLegacySeasonGear then
+                        return true
+                    elseif not eq.isLegacySeasonGear and parsedLoot.isLegacySeasonGear then
+                        return false
+                    end
+
+                    local eqOrder = TRACK_ORDER[eq.upgradeTrack] or 0
+                    local lootOrder = TRACK_ORDER[parsedLoot.upgradeTrack] or 0
+
+                    if lootOrder > eqOrder or
+                       (lootOrder == eqOrder and parsedLoot.itemLevel > eq.itemLevel) then
+                        return true
+                    end
                 end
             end
         end
     end
 
-    print(">> DEBUG: No upgrade track detected.")
-    return nil
-end
-
-local function GetItemSeason(itemLink)
-    local tooltip = CreateFrame("GameTooltip", "LootTrackerSeasonTooltip", nil, "GameTooltipTemplate")
-    tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-    tooltip:SetHyperlink(itemLink)
-
-    print(">> DEBUG: Scanning season info for item = " .. tostring(itemLink))
-
-    for i = 1, tooltip:NumLines() do
-        local line = _G["LootTrackerSeasonTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-        if text then
-            print(">> DEBUG: Tooltip line " .. i .. ": " .. text)
-            local season = text:match("Season (%d+)")
-            if season then
-                print(">> DEBUG: Found season = " .. season)
-                return tonumber(season)
+    -- If loot is OFF-HAND, and equipped is a Two-Hander, treat as future potential
+    if parsedLoot.slot == "OFFHAND" and parsedLoot.subClass:match("Held In Off%-Hand") then
+        for _, eqLink in ipairs(equippedLinks) do
+            local eq = ScanItem(eqLink)
+            if eq and eq.subClass and eq.subClass:match("Two%-Hand") then
+                local lootOrder = TRACK_ORDER[parsedLoot.upgradeTrack] or 0
+                local eqOrder = TRACK_ORDER[eq.upgradeTrack] or 0
+                if lootOrder > eqOrder then
+                    RaidToolsUtils.PrintDebug("Future Combo Flag: Off-hand is from higher track than equipped 2H — consider pairing with 1H.")
+                    return true
+                end
             end
         end
     end
 
-    print(">> DEBUG: No season detected. Using CURRENT_SEASON = " .. tostring(CURRENT_SEASON))
-    return CURRENT_SEASON
-end
-
-local function GetItemLevel(itemLink)
-    local tooltip = CreateFrame("GameTooltip", "LootTrackerILVLTooltip", nil, "GameTooltipTemplate")
-    tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-    tooltip:SetHyperlink(itemLink)
-
-    print(">> DEBUG: Scanning item level for item = " .. tostring(itemLink))
-
-    for i = 1, tooltip:NumLines() do
-        local line = _G["LootTrackerILVLTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-        if text then
-            print(">> DEBUG: Tooltip line " .. i .. ": " .. text)
-            local ilvl = text:match("Item Level (%d+)")
-            if ilvl then
-                print(">> DEBUG: Found item level = " .. ilvl)
-                return tonumber(ilvl)
+    -- If loot is ONE-HAND, and equipped is a Two-Hander, treat as future potential
+    if parsedLoot.slot == "MAINHAND" and parsedLoot.subClass:match("One%-Hand") then
+        for _, eqLink in ipairs(equippedLinks) do
+            local eq = ScanItem(eqLink)
+            if eq and eq.subClass and eq.subClass:match("Two%-Hand") then
+                local lootOrder = TRACK_ORDER[parsedLoot.upgradeTrack] or 0
+                local eqOrder = TRACK_ORDER[eq.upgradeTrack] or 0
+                if lootOrder > eqOrder then
+                    RaidToolsUtils.PrintDebug("Future Combo Flag: 1H weapon from higher track than equipped 2H — off-hand pairing possible.")
+                    return true
+                end
             end
         end
     end
 
-    print(">> DEBUG: No item level detected.")
-    return nil
-end
-
-local function IsCrafted(itemLink)
-    local tooltip = CreateFrame("GameTooltip", "LootTrackerCraftedTooltip", nil, "GameTooltipTemplate")
-    tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-    tooltip:SetHyperlink(itemLink)
-
-    print(">> DEBUG: Scanning for 'crafted' keyword in item = " .. tostring(itemLink))
-
-    for i = 1, tooltip:NumLines() do
-        local line = _G["LootTrackerCraftedTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-        if text then
-            print(">> DEBUG: Tooltip line " .. i .. ": " .. text)
-            if text:lower():find("crafted") then
-                print(">> DEBUG: Match found — item is crafted.")
-                return true
+    -- If loot is TWO-HAND, check against both 1H + OH — must be better than at least one
+    if parsedLoot.subClass and parsedLoot.subClass:match("Two%-Hand") then
+        for _, eqLink in ipairs(equippedLinks) do
+            local eq = ScanItem(eqLink)
+            if eq and eq.itemLevel and (eq.subClass:match("One%-Hand") or eq.subClass:match("Held In Off%-Hand")) then
+                if parsedLoot.itemLevel > eq.itemLevel then
+                    RaidToolsUtils.PrintDebug("Weapon Upgrade Check: 2H is stronger than one of the current 1H/OH combo.")
+                    return true
+                end
             end
         end
     end
 
-    print(">> DEBUG: No crafted keyword found — item is not crafted.")
     return false
 end
 
--- 🧠 Determine Which Gear Slots to Check
-local function ResolveSlots(itemLink)
-    local itemType = GetItemType(itemLink)
-    print(">> DEBUG: Item type resolved as: " .. tostring(itemType))
-
-    if not itemType then
-        print(">> DEBUG: No item type detected. Defaulting to ring slot (11).")
-        return {11}
-    end
-
-    local slotMap = {
-        ["INVTYPE_FINGER"]         = {11, 12},
-        ["INVTYPE_TRINKET"]        = {13, 14},
-        ["INVTYPE_WEAPON"]         = {16},
-        ["INVTYPE_2HWEAPON"]       = {16},
-        ["INVTYPE_WEAPONMAINHAND"] = {16},
-        ["INVTYPE_WEAPONOFFHAND"]  = {17},
-        ["INVTYPE_SHIELD"]         = {17},
-        ["INVTYPE_HOLDABLE"]       = {17}
-    }
-
-    local slots = slotMap[itemType]
-    if slots then
-        print(">> DEBUG: Mapped slot(s): " .. table.concat(slots, ", "))
-        return slots
-    end
-
-    local fallback = GetEquipmentSlotForItem(itemLink) or 11
-    print(">> DEBUG: No direct mapping. Fallback slot resolved as: " .. tostring(fallback))
-    return {fallback}
-end
-
--- 🔍 Parse Equipment Slot from Tooltip (Fallback)
-function GetEquipmentSlotForItem(itemLink)
-    local slotKeywords = {
-        ["Head"] = 1, ["Neck"] = 2, ["Shoulder"] = 3, ["Back"] = 15,
-        ["Chest"] = 5, ["Wrist"] = 9, ["Hands"] = 10,
-        ["Waist"] = 6, ["Legs"] = 7, ["Feet"] = 8,
-        ["Finger"] = 11, ["Trinket"] = 13,
-        ["Main Hand"] = 16, ["Off Hand"] = 17
-    }
-
-    print(">> DEBUG: Analyzing item link: " .. tostring(itemLink))
-
-    local tooltip = CreateFrame("GameTooltip", "LootTrackerSlotTooltip", nil, "GameTooltipTemplate")
-    tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-    tooltip:SetHyperlink(itemLink)
-
-    for i = 1, tooltip:NumLines() do
-        local line = _G["LootTrackerSlotTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-        if text then
-            print(">> DEBUG: Tooltip line " .. i .. ": " .. text)
-            for keyword, slotID in pairs(slotKeywords) do
-                if text:find(keyword) then
-                    print(">> DEBUG: Found keyword '" .. keyword .. "' → Slot ID: " .. slotID)
-                    return slotID
-                end
-            end
-        end
-    end
-
-    print(">> DEBUG: No matching slot keyword found in tooltip for item.")
-    return nil
-end
-
--- 📦 Detect Item Type from Tooltip (Simplified)
-function GetItemType(itemLink)
-    print(">> DEBUG: Resolving item type for link: " .. tostring(itemLink))
-
-    local tooltip = CreateFrame("GameTooltip", "LootTrackerTypeTooltip", nil, "GameTooltipTemplate")
-    tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-    tooltip:SetHyperlink(itemLink)
-
-    for i = 1, tooltip:NumLines() do
-        local line = _G["LootTrackerTypeTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-        if text then
-            print(">> DEBUG: Tooltip line " .. i .. ": " .. text)
-
-            if text:find("Trinket") then
-                print(">> DEBUG: Matched 'Trinket' → INVTYPE_TRINKET")
-                return "INVTYPE_TRINKET"
-            end
-            if text:find("Finger") then
-                print(">> DEBUG: Matched 'Finger' → INVTYPE_FINGER")
-                return "INVTYPE_FINGER"
-            end
-            if text:find("Two%-Hand") then
-                print(">> DEBUG: Matched 'Two-Hand' → INVTYPE_2HWEAPON")
-                return "INVTYPE_2HWEAPON"
-            end
-            if text:find("Main Hand") then
-                print(">> DEBUG: Matched 'Main Hand' → INVTYPE_WEAPONMAINHAND")
-                return "INVTYPE_WEAPONMAINHAND"
-            end
-            if text:find("Off Hand") or text:find("Shield") then
-                print(">> DEBUG: Matched 'Off Hand' or 'Shield' → INVTYPE_WEAPONOFFHAND")
-                return "INVTYPE_WEAPONOFFHAND"
-            end
-        end
-    end
-
-    print(">> DEBUG: No item type keyword matched in tooltip.")
-    return nil
-end
-
--- 🧠 Compare If Player Has Superior Gear
-local function HasBetterItem(playerName, itemLink, mode)
-    local trackNew = GetUpgradeTrack(itemLink)
-    local ilvlNew = GetItemLevel(itemLink)
-    local seasonNew = GetItemSeason(itemLink) or CURRENT_SEASON
-    local isCrafted = IsCrafted(itemLink)
-
-    print(">> DEBUG: Checking loot for " .. playerName)
-    print(">> DEBUG: Loot item → Track=" .. tostring(trackNew) ..
-          ", iLvl=" .. tostring(ilvlNew) ..
-          ", Season=" .. tostring(seasonNew) ..
-          ", Crafted=" .. tostring(isCrafted))
-
-    if not ilvlNew then
-        print(">> DEBUG: Missing ilvl for loot item.")
+-- Evaluates if the loot item is an upgrade for player
+local function HasBetterItem(playerName, itemLink)
+    local parsedLoot = ScanItem(itemLink)
+    if not parsedLoot or not parsedLoot.itemLevel or not parsedLoot.slot then
+        RaidToolsUtils.PrintDebug("Invalid loot item.")
         return false
     end
 
-    local slotsToCheck = ResolveSlots(itemLink)
-    print(">> DEBUG: Resolved slots to check: " .. table.concat(slotsToCheck, ", "))
-
-    local allSlotsSuperior = true
-
-    for _, slot in ipairs(slotsToCheck) do
-        local equipped = GetInventoryItemLink(playerName, slot)
-        if equipped then
-            local eqTrack = GetUpgradeTrack(equipped)
-            local eqIlvl = GetItemLevel(equipped)
-            local eqSeason = GetItemSeason(equipped) or CURRENT_SEASON
-            local eqIsCrafted = IsCrafted(equipped)
-
-            print(">> DEBUG: Equipped item in slot " .. slot ..
-                  " → Track=" .. tostring(eqTrack) ..
-                  ", iLvl=" .. tostring(eqIlvl) ..
-                  ", Season=" .. tostring(eqSeason) ..
-                  ", Crafted=" .. tostring(eqIsCrafted))
-
-            if eqIlvl then
-                local isSuperior = false
-
-                if mode == "ilvl" then
-                    isSuperior = eqIlvl >= ilvlNew
-                    print(">> DEBUG: Mode='ilvl' → Comparing Equipped iLvl " .. eqIlvl .. " vs Loot iLvl " .. ilvlNew)
-                else
-                    if eqTrack then
-                        if isCrafted then
-                            local maxTrackIlvl = TRACK_MAX_ILVL[trackNew]
-                            print(">> DEBUG: Crafted comparison → MaxTrackILvl=" .. tostring(maxTrackIlvl))
-                            isSuperior = maxTrackIlvl and eqIlvl >= maxTrackIlvl
-                        else
-                            print(">> DEBUG: Non-crafted comparison")
-                            if eqSeason > seasonNew then
-                                print(">> DEBUG: Equipped item is from newer season.")
-                                isSuperior = true
-                            elseif eqSeason < seasonNew then
-                                print(">> DEBUG: Equipped item is from older season.")
-                                isSuperior = false
-                            else
-                                isSuperior = (TRACK_ORDER[eqTrack] > TRACK_ORDER[trackNew]) or
-                                             (TRACK_ORDER[eqTrack] == TRACK_ORDER[trackNew] and eqIlvl >= ilvlNew)
-                                print(">> DEBUG: Mode='track' → Order=" .. tostring(TRACK_ORDER[eqTrack]) ..
-                                      " vs " .. tostring(TRACK_ORDER[trackNew]) ..
-                                      ", iLvl=" .. tostring(eqIlvl) .. " vs " .. tostring(ilvlNew))
-                            end
-                        end
-                    else
-                        print(">> DEBUG: Missing eqTrack for 'track' mode. Assuming loot is better.")
-                        isSuperior = false
-                    end
-                end
-
-                if not isSuperior then
-                    print(">> DEBUG: Loot is better or equal in slot " .. slot)
-                    allSlotsSuperior = false
-                else
-                    print(">> DEBUG: Equipped item is superior in slot " .. slot)
-                end
-            else
-                print(">> DEBUG: Missing item level for equipped item in slot " .. slot)
-                allSlotsSuperior = false
-            end
-        else
-            print(">> DEBUG: No item equipped in slot " .. slot)
-            allSlotsSuperior = false
-        end
+    local slotIds = GetInventorySlotsFromParsed(parsedLoot.slot)
+    if #slotIds == 0 then
+        RaidToolsUtils.PrintDebug("Could not resolve slot(s) for " .. parsedLoot.slot)
+        return false
     end
 
-    print(">> DEBUG: All slots superior = " .. tostring(allSlotsSuperior))
-    return allSlotsSuperior
+    local equippedLinks = {}
+    for _, slotId in ipairs(slotIds) do
+        local eqLink = GetInventoryItemLink(playerName, slotId)
+        if eqLink then table.insert(equippedLinks, eqLink) end
+    end
+
+    if #equippedLinks == 0 then
+        RaidToolsUtils.PrintDebug("No equipped items found in slot(s) " .. parsedLoot.slot)
+        return false
+    end
+
+    local isUpgrade = IsLootBetterThanEquipped(parsedLoot, equippedLinks)
+    RaidToolsUtils.PrintDebug("Loot upgrade status for " .. parsedLoot.slot .. " → " .. tostring(isUpgrade))
+    return isUpgrade
 end
 
 -- 📡 Live Raid Roll Evaluation
-local function EvaluateModernLootRolls(mode)
-    mode = (mode == "ilvl") and "ilvl" or "track"
-    print(">> DEBUG: Evaluation mode set to: " .. mode)
+local function EvaluateModernLootRolls()
 
     local encounters = C_LootHistory.GetAllEncounterInfos()
     if not encounters then
-        print(">> DEBUG: No encounter history found.")
+        RaidToolsUtils.PrintDebug("No encounter history found.")
         return
     end
 
     for _, encounter in ipairs(encounters) do
-        print(">> DEBUG: Processing encounter: " .. tostring(encounter.encounterID))
+        RaidToolsUtils.PrintDebug("Processing encounter: " .. tostring(encounter.encounterID))
         local drops = C_LootHistory.GetSortedDropsForEncounter(encounter.encounterID)
 
         if drops then
@@ -332,29 +246,32 @@ local function EvaluateModernLootRolls(mode)
                 local winnerInfo = drop.winner
                 local rollInfos = drop.rollInfos
 
-                print(">> DEBUG: Found drop: " .. tostring(item))
+                RaidToolsUtils.PrintDebug("Found drop: " .. tostring(item))
 
                 if item and winnerInfo and rollInfos then
                     local winnerName = winnerInfo.playerName
                     local valid = {}
 
                     for _, r in ipairs(rollInfos) do
-                        print(">> DEBUG: Roll by " .. r.playerName .. 
-                              " → State=" .. tostring(r.state) .. 
-                              ", Winner=" .. tostring(r.isWinner))
+                        RaidToolsUtils.PrintDebug(r.playerName .. " rolled " .. r.state .. " with " .. tostring(r.roll) .. " for " .. item .. ". Won = " .. r.isWinner)
 
                         if r.state == Enum.EncounterLootDropRollState.NeedMainSpec then
-                            local hasBetter = HasBetterItem(r.playerName, item, mode)
-                            print(">> DEBUG: " .. r.playerName .. " HasBetterItem=" .. tostring(hasBetter))
+                            local hasBetter = HasBetterItem(r.playerName, item)
+                            RaidToolsUtils.PrintDebug(r.playerName .. " HasBetterItem=" .. tostring(hasBetter))
                             table.insert(valid, {
                                 name = r.playerName,
                                 won = r.isWinner,
-                                betterGear = hasBetter
+                                betterGear = hasBetter,
+                                rollValue = r.roll
                             })
                         end
+
+                        table.sort(valid, function(a, b)
+                            return (a.rollValue or 0) > (b.rollValue or 0)
+                        end)
                     end
 
-                    print(">>RaidTools " .. winnerName .. " won this item: " .. item)
+                    RaidToolsUtils.PrintDebug(winnerName .. " won this item: " .. item)
 
                     for _, r in ipairs(valid) do
                         if r.betterGear then
@@ -374,11 +291,74 @@ local function EvaluateModernLootRolls(mode)
                         end
                     end
                 else
-                    print(">> DEBUG: Missing item/winner/rollInfos in drop data.")
+                    RaidToolsUtils.PrintDebug("Mssing item/winner/rollInfos in drop data.")
                 end
             end
         else
-            print(">> DEBUG: No drops found for encounter " .. tostring(encounter.encounterID))
+            RaidToolsUtils.PrintDebug("No drops found for encounter " .. tostring(encounter.encounterID))
+        end
+    end
+end
+
+SLASH_PARSELOOT1 = "/parseloot"
+SlashCmdList["PARSELOOT"] = function(msg)
+    local itemLink = msg:match("|c.-|r")
+    if not itemLink then
+        print("Usage: /parseloot [itemLink] ← shift-click an item")
+        return
+    end
+
+    local parsed = ScanItem(itemLink)
+    if not parsed then
+        print(">> DEBUG: Could not parse item.")
+        return
+    end
+
+    -- Print parsed loot
+    print(">> Parsed Loot: " .. itemLink)
+    print("  • Item Level: " .. parsed.itemLevel)
+    print("  • Upgrade Track: " .. parsed.upgradeTrack)
+    print("  • Slot: " .. parsed.slot)
+    print("  • Crafted: " .. tostring(parsed.isCrafted))
+    print("  • Legacy Season Gear: " .. tostring(parsed.isLegacySeasonGear))
+
+    -- Expanded slot mapping for more accurate comparison
+    local slots = {
+        ["HEAD"] = 1,
+        ["NECK"] = 2,
+        ["SHOULDER"] = 3,
+        ["CHEST"] = 5,
+        ["WAIST"] = 6,
+        ["LEGS"] = 7,
+        ["FEET"] = 8,
+        ["WRIST"] = 9,
+        ["HANDS"] = 10,
+        ["FINGER"] = {11, 12},
+        ["TRINKET"] = {13, 14},
+        ["BACK"] = 15,
+        ["MAINHAND"] = 16,
+        ["OFFHAND"] = 17,
+        ["RANGED"] = 18
+    }
+
+    local equipSlot = slots[parsed.slot]
+    if not equipSlot then
+        print(">> DEBUG: Unknown equip slot for comparison [" .. tostring(parsed.slot) .. "]")
+        return
+    end
+
+    local equippedItems = type(equipSlot) == "table" and equipSlot or {equipSlot}
+    for _, slotID in ipairs(equippedItems) do
+        local equippedLink = GetInventoryItemLink("player", slotID)
+        if equippedLink then
+            local equippedParsed = ScanItem(equippedLink)
+            print(">> Equipped Item (Slot " .. slotID .. "): " .. equippedLink)
+            print("  • Item Level: " .. equippedParsed.itemLevel)
+            print("  • Upgrade Track: " .. equippedParsed.upgradeTrack)
+            print("  • Crafted: " .. tostring(equippedParsed.isCrafted))
+            print("  • Legacy Season Gear: " .. tostring(equippedParsed.isLegacySeasonGear))
+        else
+            print(">> Equipped Slot " .. slotID .. ": (empty)")
         end
     end
 end
@@ -388,7 +368,7 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("LOOT_ROLLS_COMPLETE")
 frame:SetScript("OnEvent", function(_, event)
     if event == "LOOT_ROLLS_COMPLETE" then
-        EvaluateModernLootRolls(_G.RaidToolsDB and _G.RaidToolsDB.rollMode or "track")
+        EvaluateModernLootRolls()
     end
 end)
 

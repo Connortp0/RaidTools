@@ -6,6 +6,7 @@ if not _G.RaidToolsDB.strikes then _G.RaidToolsDB.strikes = {} end
 if _G.RaidToolsDB._BListMigrated == nil then _G.RaidToolsDB._BListMigrated = false end
 if not _G.RaidToolsDB.currentMode then _G.RaidToolsDB.currentMode = "None" end
 if not _G.RaidToolsDB.rollMode then _G.RaidToolsDB.rollMode = "track" end
+if not _G.RaidToolsDB.debugMode then _G.RaidToolsDB.debugMode = false end
 _G.RaidToolsDB._modeConfirmed = false
 
 function RefreshRTSystem()
@@ -104,6 +105,7 @@ function SlashCmdList.RAIDTOOLS(msg, editBox)
         print("/rt blacklist - List blacklist entries")
         print("/rt blacklist add <Name-Realm> - Add to blacklist")
         print("/rt blacklist remove <Name-Realm> - Remove from blacklist")
+        print("/rt debug <on/off> - Enables/Disables debug mode for showing RaidTools debug messages")
     elseif cmd == "refresh" then
         RefreshRTSystem()
     elseif cmd == "strike" then
@@ -149,6 +151,16 @@ function SlashCmdList.RAIDTOOLS(msg, editBox)
             end
         else
             print("Unknown subcommand for /rt blacklist. Use 'add' or 'remove' or '' to list blacklisted players.")
+        end
+    elseif cmd == "debug" then
+        if arg == "on" then
+            _G.RaidToolsDB.debugMode = true
+            print(">>RaidTools: Debug mode enabled.")
+        elseif arg == "off" then
+            _G.RaidToolsDB.debugMode = false
+            print(">>RaidTools: Debug mode disabled.")
+        else
+            print("Unknown argument for /rt debug. Use 'on' or 'off'.")
         end
     else
         print("Unknown command: " .. cmd)
