@@ -153,10 +153,10 @@ function SlashCmdList.RAIDTOOLS(msg, editBox)
             print("Unknown subcommand for /rt blacklist. Use 'add' or 'remove' or '' to list blacklisted players.")
         end
     elseif cmd == "debug" then
-        if arg == "on" then
+        if subcmd == "on" then
             _G.RaidToolsDB.debugMode = true
             print(">>RaidTools: Debug mode enabled.")
-        elseif arg == "off" then
+        elseif subcmd == "off" then
             _G.RaidToolsDB.debugMode = false
             print(">>RaidTools: Debug mode disabled.")
         else
