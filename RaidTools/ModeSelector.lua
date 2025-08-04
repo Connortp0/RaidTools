@@ -65,7 +65,7 @@ function ModeSelector:Show()
 end
 
 function ModeSelector:PromptIfNeeded()
-    if (IsInGroup() == true or IsInRaid() == true) and _G.RaidToolsDB._modeConfirmed == false then
+    if IsInRaid() == true and _G.RaidToolsDB._modeConfirmed == false then
         ModeSelector:Show()
     end
 end

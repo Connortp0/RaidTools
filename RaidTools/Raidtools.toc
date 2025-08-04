@@ -9,4 +9,4 @@ RaidTools.lua
 RaidToolsUtils.lua
 FlyoutMenu.lua
 ModeSelector.lua
-LootTracker.lua
+LootTrackerV2.lua

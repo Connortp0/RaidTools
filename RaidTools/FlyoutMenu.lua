@@ -214,7 +214,7 @@ function FlyoutMenu:Refresh(groupMembers, db, targetName, isTargetedPlayer)
         self:HidePlayerBlock()
     end
 
-    if IsInRaid() or IsInGroup() then
+    if IsInRaid() then
         self:Show()
     else
         self:Hide()

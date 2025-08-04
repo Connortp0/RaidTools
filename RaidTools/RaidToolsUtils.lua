@@ -26,8 +26,6 @@ function RaidToolsUtils.AddToBlacklist(playerName, shouldRaidWarn, shouldKick, c
                 else
                     chatType = "RAID"
                 end
-            elseif IsInGroup() then
-                chatType = "PARTY"
             end
             if shouldKick and cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " has been kicked for repeated offenses. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
@@ -67,8 +65,6 @@ function RaidToolsUtils.AddStrike(playerName, shouldRaidWarn, cmd)
                 else
                     chatType = "RAID"
                 end
-            elseif IsInGroup() then
-                chatType = "PARTY"
             end
             if _G.RaidToolsDB.strikes[playerName] == 1 and cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
@@ -107,30 +103,23 @@ function RaidToolsUtils.GetCurrentGroupMembers()
                 table.insert(groupMembers, fullName)
             end
         end
-    elseif IsInGroup() then
-        for i = 1, GetNumSubgroupMembers() do
-            local name, realm = UnitName("party" .. i)
-            if realm == nil then
-                realm = GetRealmName()
-            end
-            if name then
-                local fullName = name .. "-" .. realm
-                table.insert(groupMembers, fullName)
-            end
-        end
-    else
-        -- Add player’s own name too
-        local name, realm = UnitName("player")
-        local fullName = ""
-        if realm == nil then
-            realm = GetRealmName()
-        end
-        if name then
-            fullName = name .. "-" .. realm
-            table.insert(groupMembers, fullName)
-        end
     end
     return groupMembers
+end
+
+function RaidToolsUtils.FindRaidUnit(charName)
+    -- Loop through raid members to find matching name
+    for i = 1, GetNumGroupMembers() do
+        local unitID = "raid" .. i
+        local name = UnitName(unitID)
+
+        if name and name == charName then
+            return unitID
+        end
+    end
+
+    -- Return nil if no match found
+    return nil
 end
 
 function RaidToolsUtils.WriteDebugMessage(message)
