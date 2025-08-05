@@ -2,7 +2,7 @@
 ## Title: RaidTools
 ## Notes: An addon for raid leaders.
 ## Author: SinfulFish
-## Version: 11.2.0Rv17
+## Version: 11.2.0Bv17
 ## SavedVariables: BList, RaidToolsDB 
 
 RaidTools.lua

@@ -112,13 +112,9 @@ local function ParseTooltipLines(tooltip)
     return parsed
 end
 
-function ScanTooltip(tooltip, itemLink)
+function ParseTooltipWrapper(tooltip, itemLink)
     local parsed = ParseTooltipLines(tooltip)
     parsed.itemLink = itemLink
-
-    -- Add subclass info from API
-    local _, _, _, _, _, _, subClass = C_Item.GetItemInfo(itemLink)
-    parsed.subClass = subClass
 
     return parsed
 end
@@ -131,7 +127,7 @@ function ScanItem(itemLink)
     lootScanTooltip:SetHyperlink(itemLink)
     lootScanTooltip:Show()
 
-    return ScanTooltip(lootScanTooltip, itemLink)
+    return ParseTooltipWrapper(lootScanTooltip, itemLink)
 end
 
 -- Compares loot against a list of equipped itemLinks
