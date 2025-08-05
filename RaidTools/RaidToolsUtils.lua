@@ -122,10 +122,4 @@ function RaidToolsUtils.FindRaidUnit(charName)
     return nil
 end
 
-function RaidToolsUtils.WriteDebugMessage(message)
-    if _G.RaidToolsDB.debugMode == true then
-        print(">>RaidTools DEBUG: " .. message)
-    end
-end
-
 _G.RaidToolsUtils = RaidToolsUtils
