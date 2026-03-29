@@ -47,17 +47,21 @@ end
 
 UIDropDownMenu_Initialize(modeDropdown, function(self, level)
     for _, mode in ipairs(modes) do
-        local info = UIDropDownMenu_CreateInfo()
-        info.text = mode
-        info.checked = _G.RaidToolsDB.currentMode == mode
-        info.func = function()
-            _G.RaidToolsDB.currentMode = mode
-            _G.RaidToolsDB._modeConfirmed = true
-            UIDropDownMenu_SetText(modeDropdown, mode)
-            info.checked = true
-            print(">> RaidTools mode changed to:", mode)
+        if mode == "My Group" and (not RaidToolsUtils.CanUseMyGroupMode() or C_LFGInfo.IsInLFGDungeon()) then
+            -- hide My Group option for non-authorized users or in LFG
+        else
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = mode
+            info.checked = _G.RaidToolsDB.currentMode == mode
+            info.func = function()
+                _G.RaidToolsDB.currentMode = mode
+                _G.RaidToolsDB._modeConfirmed = true
+                UIDropDownMenu_SetText(modeDropdown, mode)
+                info.checked = true
+                print(">> RaidTools mode changed to:", mode)
+            end
+            UIDropDownMenu_AddButton(info, level)
         end
-        UIDropDownMenu_AddButton(info, level)
     end
 end)
 -- Add label above dropdown
@@ -84,16 +88,6 @@ local function CreateScrollList(parent, title, anchorY)
     local content = CreateFrame("Frame", nil, scrollFrame)
     content:SetSize(150, 90)
     scrollFrame:SetScrollChild(content)
-
-    local borderFrame = CreateFrame("Frame", nil, scrollFrame, "BackdropTemplate")
-    borderFrame:SetAllPoints(scrollFrame)
-    borderFrame:SetBackdrop({
-        bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
-        edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
-        edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    borderFrame:SetBackdropColor(0, 0, 0, 0.6)
 
     content.lines = {}
 
@@ -138,6 +132,10 @@ function FlyoutMenu:UpdateLists(groupMembers, db)
                 blacklistContent.lines[blackListIndex]:SetTextColor(unpack(color))
                 blacklistContent.lines[blackListIndex]:Show()
                 blackListIndex = blackListIndex + 1
+                local playerBListWarn = ">>RaidTools: " .. name .. " is on your Raid Tools BList."
+                print(playerBListWarn)
+                RaidNotice_AddMessage(RaidWarningFrame, playerBListWarn, { r = 1.0, g = 0.0, b = 0.0 }) -- red text, no sound
+
             end
         end
     end
@@ -220,7 +218,7 @@ function FlyoutMenu:Refresh(groupMembers, db, targetName, isTargetedPlayer)
         self:HidePlayerBlock()
     end
 
-    if IsInRaid() or IsInGroup() then
+    if IsInGroup() then
         self:Show()
     else
         self:Hide()

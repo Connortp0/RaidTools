@@ -42,17 +42,29 @@ local function CreateModeButton(label, offsetY)
     button:SetScript("OnClick", function()
         ModeSelector:SetMode(label)
     end)
+    return button
 end
 
 CreateModeButton("None", -5)
 CreateModeButton("Silent", -35)
-CreateModeButton("My Group", -65)
+local myGroupButton = CreateModeButton("My Group", -65)
+if not RaidToolsUtils.CanUseMyGroupMode() then
+    myGroupButton:Hide()
+end
 
 --------------------------------------------------
 -- ⚙️ Mode Logic
 --------------------------------------------------
 
 function ModeSelector:SetMode(mode)
+    if mode == "My Group" and not RaidToolsUtils.CanUseMyGroupMode() then
+        print(">>RaidTools: Only raid leader or assistant can use My Group mode.")
+        _G.RaidToolsDB.currentMode = "None"
+        _G.RaidToolsDB._modeConfirmed = true
+        RefreshRTSystem()
+        return
+    end
+
     modePopup:Hide()
     _G.RaidToolsDB.currentMode = mode
     _G.RaidToolsDB._modeConfirmed = true
@@ -61,11 +73,14 @@ function ModeSelector:SetMode(mode)
 end
 
 function ModeSelector:Show()
+    if myGroupButton then
+        myGroupButton:SetShown(RaidToolsUtils.CanUseMyGroupMode() and not C_LFGInfo.IsInLFGDungeon())
+    end
     modePopup:Show()
 end
 
 function ModeSelector:PromptIfNeeded()
-    if (IsInGroup() == true or IsInRaid() == true) and _G.RaidToolsDB._modeConfirmed == false then
+    if IsInGroup() == true and _G.RaidToolsDB._modeConfirmed == false then
         ModeSelector:Show()
     end
 end

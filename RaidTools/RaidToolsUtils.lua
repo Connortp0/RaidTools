@@ -1,3 +1,4 @@
+-- RaidToolsUtils.lua
 local RaidToolsUtils = {}
 -- List Functions
 function RaidToolsUtils.IsBlacklisted(playerName)
@@ -25,13 +26,10 @@ function RaidToolsUtils.AddToBlacklist(playerName, shouldRaidWarn, shouldKick, c
                 else
                     chatType = "RAID"
                 end
-            elseif IsInGroup() then
-                chatType = "PARTY"
             end
             if shouldKick and cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " has been kicked for repeated offenses. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
                 SendChatMessage("Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
-                UninviteUnit(playerName)
             elseif cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
                 SendChatMessage("Failing to do mechanics or ignoring instructions after being warned WILL result in you being REPLACED.", chatType)
@@ -66,8 +64,6 @@ function RaidToolsUtils.AddStrike(playerName, shouldRaidWarn, cmd)
                 else
                     chatType = "RAID"
                 end
-            elseif IsInGroup() then
-                chatType = "PARTY"
             end
             if _G.RaidToolsDB.strikes[playerName] == 1 and cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
@@ -75,7 +71,7 @@ function RaidToolsUtils.AddStrike(playerName, shouldRaidWarn, cmd)
             end
         end
         if _G.RaidToolsDB.strikes[playerName] >= 2 then
-            RaidToolsUtils.AddToBlacklist(playerName, true, true)
+            RaidToolsUtils.AddToBlacklist(playerName, true, true, false)
             print("Auto-blacklisted after 2 strikes.")
         end
     else
@@ -106,29 +102,67 @@ function RaidToolsUtils.GetCurrentGroupMembers()
             end
         end
     elseif IsInGroup() then
-        for i = 1, GetNumSubgroupMembers() do
-            local name, realm = UnitName("party" .. i)
-            if realm == nil then
-                realm = GetRealmName()
-            end
-            if name then
-                local fullName = name .. "-" .. realm
-                table.insert(groupMembers, fullName)
-            end
+        local playerName, playerRealm = UnitName("player")
+        if playerName then
+            playerRealm = playerRealm or GetRealmName()
+            table.insert(groupMembers, playerName .. "-" .. playerRealm)
         end
-    else
-        -- Add player’s own name too
-        local name, realm = UnitName("player")
-        local fullName = ""
-        if realm == nil then
-            realm = GetRealmName()
-        end
-        if name then
-            fullName = name .. "-" .. realm
-            table.insert(groupMembers, fullName)
+
+        for i = 1, 4 do
+            local unitID = "party" .. i
+            if UnitExists(unitID) then
+                local name, realm = UnitName(unitID)
+                if realm == nil then
+                    realm = GetRealmName()
+                end
+                if name then
+                    table.insert(groupMembers, name .. "-" .. realm)
+                end
+            end
         end
     end
     return groupMembers
+end
+
+function RaidToolsUtils.FindRaidUnit(charName)
+    -- Loop through raid/party members to find matching name
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do
+            local unitID = "raid" .. i
+            local name = UnitName(unitID)
+
+            if name and name == charName then
+                return unitID
+            end
+        end
+    elseif IsInGroup() then
+        local name = UnitName("player")
+        if name and name == charName then
+            return "player"
+        end
+
+        for i = 1, 4 do
+            local unitID = "party" .. i
+            if UnitExists(unitID) then
+                local name = UnitName(unitID)
+                if name and name == charName then
+                    return unitID
+                end
+            end
+        end
+    end
+
+    -- Return nil if no match found
+    return nil
+end
+
+function RaidToolsUtils.CanUseMyGroupMode()
+    if IsInRaid() then
+        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+    elseif IsInGroup() then
+        return UnitIsGroupLeader("player")
+    end
+    return true
 end
 
 _G.RaidToolsUtils = RaidToolsUtils
