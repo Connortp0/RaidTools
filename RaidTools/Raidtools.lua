@@ -34,7 +34,11 @@ function RefreshRTSystem()
 
     if (inGroup and not previousInGroup) or (previousCanUseMyGroup == false and canUseMyGroup == true) then
         _G.RaidToolsDB._modeConfirmed = false
-        if C_LFGInfo.IsInLFGDungeon() then
+        local inLFG = false
+        if C_LFGInfo and type(C_LFGInfo.IsInLFGDungeon) == "function" then
+            inLFG = C_LFGInfo.IsInLFGDungeon()
+        end
+        if inLFG then
             _G.RaidToolsDB.currentMode = "Silent"
         end
     end
@@ -46,7 +50,12 @@ function RefreshRTSystem()
         print(">>RaidTools: My Group mode disabled for non-leader/assistant.")
     end
 
-    FlyoutMenu:Refresh(group, RaidToolsDB, fullName, hasTarget)
+    if _G.FlyoutMenu and type(_G.FlyoutMenu.Refresh) == "function" then
+        _G.FlyoutMenu:Refresh(group, RaidToolsDB, fullName, hasTarget)
+    else
+        -- FlyoutMenu is not loaded yet (or being reloaded); safely skip refresh.
+        return
+    end
 
     if _G.ModeSelector and _G.ModeSelector.PromptIfNeeded then
         _G.ModeSelector:PromptIfNeeded()

@@ -74,7 +74,11 @@ end
 
 function ModeSelector:Show()
     if myGroupButton then
-        myGroupButton:SetShown(RaidToolsUtils.CanUseMyGroupMode() and not C_LFGInfo.IsInLFGDungeon())
+        local inLFG = false
+        if C_LFGInfo and type(C_LFGInfo.IsInLFGDungeon) == "function" then
+            inLFG = C_LFGInfo.IsInLFGDungeon()
+        end
+        myGroupButton:SetShown(RaidToolsUtils.CanUseMyGroupMode() and not inLFG)
     end
     modePopup:Show()
 end

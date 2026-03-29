@@ -46,8 +46,13 @@ local function SyncDropdownWithDB()
 end
 
 UIDropDownMenu_Initialize(modeDropdown, function(self, level)
+    local inLFG = false
+    if C_LFGInfo and type(C_LFGInfo.IsInLFGDungeon) == "function" then
+        inLFG = C_LFGInfo.IsInLFGDungeon()
+    end
+
     for _, mode in ipairs(modes) do
-        if mode == "My Group" and (not RaidToolsUtils.CanUseMyGroupMode() or C_LFGInfo.IsInLFGDungeon()) then
+        if mode == "My Group" and (not RaidToolsUtils.CanUseMyGroupMode() or inLFG) then
             -- hide My Group option for non-authorized users or in LFG
         else
             local info = UIDropDownMenu_CreateInfo()
