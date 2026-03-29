@@ -1,1 +1,1 @@
-READE
+README
