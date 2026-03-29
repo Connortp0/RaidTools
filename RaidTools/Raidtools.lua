@@ -13,14 +13,17 @@ function RefreshRTSystem()
     local group = RaidToolsUtils:GetCurrentGroupMembers()
     local name, realm = UnitName("target")
     local fullName = ""
-    local hasTarget = name ~= nil and name ~= "" and UnitIsPlayer("target")
-    
-    if realm == nil then
-        realm = GetRealmName()
-    end
-    
-    if hasTarget and name and realm then
-        fullName = name .. "-" .. realm
+    local hasTarget = UnitExists("target") and UnitIsPlayer("target")
+
+    if hasTarget and name then
+        if realm == nil then
+            realm = GetRealmName()
+        end
+        if realm and realm ~= "" then
+            fullName = name .. "-" .. realm
+        else
+            fullName = name
+        end
     end
 
     FlyoutMenu:Refresh(group, RaidToolsDB, fullName, hasTarget)
