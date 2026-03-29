@@ -101,23 +101,68 @@ function RaidToolsUtils.GetCurrentGroupMembers()
                 table.insert(groupMembers, fullName)
             end
         end
+    elseif IsInGroup() then
+        local playerName, playerRealm = UnitName("player")
+        if playerName then
+            playerRealm = playerRealm or GetRealmName()
+            table.insert(groupMembers, playerName .. "-" .. playerRealm)
+        end
+
+        for i = 1, 4 do
+            local unitID = "party" .. i
+            if UnitExists(unitID) then
+                local name, realm = UnitName(unitID)
+                if realm == nil then
+                    realm = GetRealmName()
+                end
+                if name then
+                    table.insert(groupMembers, name .. "-" .. realm)
+                end
+            end
+        end
     end
     return groupMembers
 end
 
 function RaidToolsUtils.FindRaidUnit(charName)
-    -- Loop through raid members to find matching name
-    for i = 1, GetNumGroupMembers() do
-        local unitID = "raid" .. i
-        local name = UnitName(unitID)
+    -- Loop through raid/party members to find matching name
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do
+            local unitID = "raid" .. i
+            local name = UnitName(unitID)
 
+            if name and name == charName then
+                return unitID
+            end
+        end
+    elseif IsInGroup() then
+        local name = UnitName("player")
         if name and name == charName then
-            return unitID
+            return "player"
+        end
+
+        for i = 1, 4 do
+            local unitID = "party" .. i
+            if UnitExists(unitID) then
+                local name = UnitName(unitID)
+                if name and name == charName then
+                    return unitID
+                end
+            end
         end
     end
 
     -- Return nil if no match found
     return nil
+end
+
+function RaidToolsUtils.CanUseMyGroupMode()
+    if IsInRaid() then
+        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+    elseif IsInGroup() then
+        return UnitIsGroupLeader("player")
+    end
+    return true
 end
 
 _G.RaidToolsUtils = RaidToolsUtils

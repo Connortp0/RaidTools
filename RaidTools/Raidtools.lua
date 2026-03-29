@@ -9,6 +9,9 @@ if not _G.RaidToolsDB.rollMode then _G.RaidToolsDB.rollMode = "track" end
 if not _G.RaidToolsDB.debugMode then _G.RaidToolsDB.debugMode = false end
 _G.RaidToolsDB._modeConfirmed = false
 
+local previousInGroup = false
+local previousCanUseMyGroup = nil
+
 function RefreshRTSystem()
     local group = RaidToolsUtils:GetCurrentGroupMembers()
     local name, realm = UnitName("target")
@@ -26,9 +29,28 @@ function RefreshRTSystem()
         end
     end
 
+    local inGroup = IsInGroup()
+    local canUseMyGroup = RaidToolsUtils.CanUseMyGroupMode()
+
+    if (inGroup and not previousInGroup) or (previousCanUseMyGroup == false and canUseMyGroup == true) then
+        _G.RaidToolsDB._modeConfirmed = false
+        if C_LFGInfo.IsInLFGDungeon() then
+            _G.RaidToolsDB.currentMode = "Silent"
+        end
+    end
+    previousInGroup = inGroup
+    previousCanUseMyGroup = canUseMyGroup
+
+    if _G.RaidToolsDB.currentMode == "My Group" and not canUseMyGroup then
+        _G.RaidToolsDB.currentMode = "None"
+        print(">>RaidTools: My Group mode disabled for non-leader/assistant.")
+    end
+
     FlyoutMenu:Refresh(group, RaidToolsDB, fullName, hasTarget)
 
-    ModeSelector:PromptIfNeeded()
+    if _G.ModeSelector and _G.ModeSelector.PromptIfNeeded then
+        _G.ModeSelector:PromptIfNeeded()
+    end
 end
 
 local function OnPlayerLogin()

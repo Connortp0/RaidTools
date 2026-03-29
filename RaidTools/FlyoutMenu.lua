@@ -47,17 +47,21 @@ end
 
 UIDropDownMenu_Initialize(modeDropdown, function(self, level)
     for _, mode in ipairs(modes) do
-        local info = UIDropDownMenu_CreateInfo()
-        info.text = mode
-        info.checked = _G.RaidToolsDB.currentMode == mode
-        info.func = function()
-            _G.RaidToolsDB.currentMode = mode
-            _G.RaidToolsDB._modeConfirmed = true
-            UIDropDownMenu_SetText(modeDropdown, mode)
-            info.checked = true
-            print(">> RaidTools mode changed to:", mode)
+        if mode == "My Group" and (not RaidToolsUtils.CanUseMyGroupMode() or C_LFGInfo.IsInLFGDungeon()) then
+            -- hide My Group option for non-authorized users or in LFG
+        else
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = mode
+            info.checked = _G.RaidToolsDB.currentMode == mode
+            info.func = function()
+                _G.RaidToolsDB.currentMode = mode
+                _G.RaidToolsDB._modeConfirmed = true
+                UIDropDownMenu_SetText(modeDropdown, mode)
+                info.checked = true
+                print(">> RaidTools mode changed to:", mode)
+            end
+            UIDropDownMenu_AddButton(info, level)
         end
-        UIDropDownMenu_AddButton(info, level)
     end
 end)
 -- Add label above dropdown
@@ -214,7 +218,7 @@ function FlyoutMenu:Refresh(groupMembers, db, targetName, isTargetedPlayer)
         self:HidePlayerBlock()
     end
 
-    if IsInRaid() then
+    if IsInGroup() then
         self:Show()
     else
         self:Hide()
