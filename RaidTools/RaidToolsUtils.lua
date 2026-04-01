@@ -26,6 +26,8 @@ function RaidToolsUtils.AddToBlacklist(playerName, shouldRaidWarn, shouldKick, c
                 else
                     chatType = "RAID"
                 end
+            elseif IsInGroup() then
+                chatType = "PARTY"
             end
             if shouldKick and cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " has been kicked for repeated offenses. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
@@ -64,6 +66,8 @@ function RaidToolsUtils.AddStrike(playerName, shouldRaidWarn, cmd)
                 else
                     chatType = "RAID"
                 end
+            elseif IsInGroup() then
+                chatType = "PARTY"
             end
             if _G.RaidToolsDB.strikes[playerName] == 1 and cmd == false then
                 SendChatMessage(">>RaidTools: " .. playerName .. " be careful what you do. We don't accept the following; Ninja looting, Abusing (Swearing at others and/or Trolling)", chatType)
